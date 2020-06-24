@@ -9,6 +9,7 @@ verify_ssl = true
 requests = "*"
 bs4 = "*"
 mypy = "*"
+fake-useragent = "*"
 
 [requires]
 python_version = "3.8"

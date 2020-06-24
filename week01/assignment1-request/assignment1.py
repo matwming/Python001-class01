@@ -1,37 +1,52 @@
+from settings import url, request_settings
 import requests
 from bs4 import BeautifulSoup
-from typing import Dict
+from typing import Dict,List
+import csv
 
-request_settings = {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.106 Safari/537.36',
-    'Accept': "*/*",
-    'Accept-Encoding': 'gazip, deflate, br',
-    'Accept-Language': 'en-AU,en;q=0.9,zh-CN;q=0.8,zh;q=0.7,la;q=0.6',
-    'Content-Type': 'text/plain',
-    'Connection': 'keep-alive',
-    'Host': 'wreport1.meituan.net',
-    'Origin': 'https://maoyan.com',
-    'Referer': 'https://maoyan.com/films?showType=3',
-    'Sec-Fetch-Dest': 'empty',
-    'Sec-Fetch-Mode': 'cors',
-    'Sec-Fetch-Site': 'cross-site',
-}
+def find_movies(html:str,num: int):
+    soup = BeautifulSoup(html,'html.parser')
+    if num == 0:
+        return
 
-cookie: Dict[str, str] = {
-    '_lxsdk_s': '172e160d2f5-d3c-12-056%7C%7C9',
-    '_lxsdk': 'E6EA16D0B55511EA9C0AF732B1940F47333B3F49B24A44A69D71339E9660483C',
-    '__mta': '220691367.1592919119180.1592919735384.1592920807858.5',
-    '_lxsdk_cuid': '172e160d2f4c8-03eb7b64f6bd08-31607402-1fa400-172e160d2f4c8',
-    'mojo-session-id': '{"id":"c68533077a8cc469069a43b2de1659c3","time":1592919118390}',
-    '_csrf': '17d7eb37864ea439b13c723541828c51462f67904c66165fb476235d25966905',
-    'mojo-trace-id': '5',
-    'uuid': 'E6EA16D0B55511EA9C0AF732B1940F47333B3F49B24A44A69D71339E9660483C',
-    'mojo-uuid': 'cccd4ad4647d90e2b94b84db623ced15',
-    'uuid_n_v': 'v1'
-}
-url: str = 'https://maoyan.com/films?showType=3'
+    movies = soup.find_all('div', class_='movie-item-hover', limit=num)
+    if len(movies) == 0:
+        print('crawl is probably blocked. Please try again.')
+        return
 
-response = requests.get(url, headers=request_settings, cookies=cookie)
+    moviesList: List[object] = []
+    for movie in movies:
+        new_soup = BeautifulSoup(str(movie),'html.parser')
+        movie_info = {
+            'name':new_soup.find_all('span',class_='name')[0].get_text(),
+            'type':new_soup.find_all('span',class_='hover-tag')[0].parent.get_text().replace(' ','').split()[1],
+            'show_time':new_soup.find_all('span',class_='hover-tag')[2].parent.get_text().replace(' ','').split()[1]
+        }
+        moviesList.append(movie_info)
+    return moviesList
 
-print(response.text)
-print(f'返回码是: {response.status_code}')
+
+def process_movies(movieList) -> None:
+    print('start to write a file...')
+    print('movieList is ', movieList)
+    with open('maoyan_movies.csv', 'w',newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['Name','Type','Show Time'])
+        for movie in movieList:
+            print('movie',movie)
+            writer.writerow([f'{movie["name"]}' ,f'{movie["type"]}',f'{movie["show_time"]}'])
+        print('writing is finished.')
+
+def main():
+    response = requests.get(url, headers=request_settings)
+    response.encoding = 'utf-8'
+    print(response.text)
+    print(f'返回码是: {response.status_code}')
+    result = find_movies(response.text,10)
+    print(result)
+    if result is None:
+        print('no movie is successfully retrieved.')
+        return
+    process_movies(result)
+
+main()
